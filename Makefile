@@ -88,20 +88,20 @@ createbin:
 
 libneko: bin/${LIBNEKO_NAME}
 
-libs:
+libs: bin/neko
 	(cd src; ${NEKO_EXEC} nekoc tools/install.neko)
 	(cd src; ${NEKO_EXEC} tools/install -silent ${INSTALL_FLAGS})
 	if [ "$$os" != "osx" ]; then strip bin/nekoc bin/nekoml bin/nekotools; fi
 
-tools:
+tools: bin/neko
 	(cd src; ${NEKO_EXEC} nekoc tools/install.neko)
 	(cd src; ${NEKO_EXEC} tools/install -nolibs)
 
-doc:
+doc: bin/neko
 	(cd src; ${NEKO_EXEC} nekoc tools/makedoc.neko)
 	(cd src; ${NEKO_EXEC} tools/makedoc)
 
-test:
+test: bin/neko
 	(cd src; ${NEKO_EXEC} nekoc tools/test.neko)
 	(cd src; ${NEKO_EXEC} tools/test)
 
@@ -140,6 +140,10 @@ install:
 	cp vm/neko*.h ${INSTALL_PREFIX}/include
 	chmod o+rx,g+rx ${INSTALL_PREFIX}/bin/neko ${INSTALL_PREFIX}/bin/nekoc ${INSTALL_PREFIX}/bin/nekotools ${INSTALL_PREFIX}/bin/nekoml ${INSTALL_PREFIX}/lib/${LIBNEKO_NAME} ${INSTALL_PREFIX}/lib/neko ${INSTALL_PREFIX}/lib/neko/*.ndll
 	chmod o+r,g+r ${INSTALL_PREFIX}/bin/nekoml.std ${INSTALL_PREFIX}/include/neko*.h
+
+install-strip: install
+	strip ${INSTALL_PREFIX}/lib/libneko.so
+	strip ${INSTALL_PREFIX}/lib/neko/*.ndll
 
 uninstall:
 	rm -rf ${INSTALL_PREFIX}/lib/${LIBNEKO_NAME}

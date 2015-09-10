@@ -109,7 +109,7 @@ neko: bin/neko
 
 std: bin/std.ndll
 
-compiler:
+compiler: bin/neko
 	(cd src; ${NEKO_EXEC} nekoml -nostd neko/Main.nml nekoml/Main.nml)
 	(cd src; ${NEKO_EXEC} nekoc -link ../boot/nekoc.n neko/Main)
 	(cd src; ${NEKO_EXEC} nekoc -link ../boot/nekoml.n nekoml/Main)

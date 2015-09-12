@@ -72,6 +72,7 @@ LIB_PREFIX = /usr/local
 LIBNEKO_LIBS = -L${LIB_PREFIX}/lib -lgc-threaded -lm
 CFLAGS += -I${LIB_PREFIX}/include
 INSTALL_ENV = CC=cc
+NEKOVM_FLAGS = -L${CURDIR}/bin -lneko
 
 endif
 

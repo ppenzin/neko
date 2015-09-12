@@ -72,7 +72,6 @@ LIB_PREFIX = /usr/local
 LIBNEKO_LIBS = -L${LIB_PREFIX}/lib -lgc-threaded -lm
 CFLAGS += -I${LIB_PREFIX}/include
 INSTALL_ENV = CC=cc
-NEKOVM_FLAGS = -L${CURDIR}/bin -lneko
 
 endif
 
@@ -118,7 +117,7 @@ compiler: bin/neko
 bin/${LIBNEKO_NAME}: ${LIBNEKO_OBJECTS}
 	${MAKESO} ${EXTFLAGS} -o $@ ${LIBNEKO_OBJECTS} ${LIBNEKO_LIBS}
 
-bin/neko: $(VM_OBJECTS)
+bin/neko: $(VM_OBJECTS) bin/${LIBNEKO_NAME}
 	${CC} ${CFLAGS} ${EXTFLAGS} -o $@ ${VM_OBJECTS} ${NEKOVM_FLAGS}
 	strip bin/neko
 

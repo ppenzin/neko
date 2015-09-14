@@ -121,7 +121,7 @@ bin/neko: $(VM_OBJECTS) bin/${LIBNEKO_NAME}
 	${CC} ${CFLAGS} ${EXTFLAGS} -o $@ ${VM_OBJECTS} ${NEKOVM_FLAGS}
 	strip bin/neko
 
-bin/std.ndll: ${STD_OBJECTS}
+bin/std.ndll: ${STD_OBJECTS} bin/${LIBNEKO_NAME}
 	${MAKESO} -o $@ ${STD_OBJECTS} ${STD_NDLL_FLAGS}
 
 clean:

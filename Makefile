@@ -88,20 +88,20 @@ createbin:
 
 libneko: bin/${LIBNEKO_NAME}
 
-libs: bin/neko
+libs: bin/neko bin/std.ndll
 	(cd src; ${NEKO_EXEC} nekoc tools/install.neko)
 	(cd src; ${NEKO_EXEC} tools/install -silent ${INSTALL_FLAGS})
 	if [ "$$os" != "osx" ]; then strip bin/nekoc bin/nekoml bin/nekotools; fi
 
-tools: bin/neko
+tools: bin/neko bin/std.ndll
 	(cd src; ${NEKO_EXEC} nekoc tools/install.neko)
 	(cd src; ${NEKO_EXEC} tools/install -nolibs)
 
-doc: bin/neko
+doc: bin/neko bin/std.ndll
 	(cd src; ${NEKO_EXEC} nekoc tools/makedoc.neko)
 	(cd src; ${NEKO_EXEC} tools/makedoc)
 
-test: bin/neko
+test: bin/neko bin/std.ndll
 	(cd src; ${NEKO_EXEC} nekoc tools/test.neko)
 	(cd src; ${NEKO_EXEC} tools/test)
 
@@ -109,7 +109,7 @@ neko: bin/neko
 
 std: bin/std.ndll
 
-compiler: bin/neko
+compiler: bin/neko bin/std.ndll
 	(cd src; ${NEKO_EXEC} nekoml -nostd neko/Main.nml nekoml/Main.nml)
 	(cd src; ${NEKO_EXEC} nekoc -link ../boot/nekoc.n neko/Main)
 	(cd src; ${NEKO_EXEC} nekoc -link ../boot/nekoml.n nekoml/Main)

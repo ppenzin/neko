@@ -3,6 +3,7 @@ set(NEKO_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/neko)
 set(NEKOML_BIN_DIR ${CMAKE_CURRENT_BINARY_DIR}/nekoml)
 set(NEKOML_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/nekoml)
 
+# This introduces a big lag, need to copy only changed files
 add_custom_target(populate_compilers_src
   COMMAND ${CMAKE_COMMAND} -E copy_directory
     ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}

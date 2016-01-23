@@ -35,3 +35,15 @@ script:
     fi
   - neko -version
   - neko src/tools/test.n
+  - nekoc src/benchs/ackerman.neko && neko src/benchs/ackerman
+  - nekoc src/benchs/binary-trees.neko && neko src/benchs/binary-trees
+  - nekoc src/benchs/fannkuch.neko && neko src/benchs/fannkuch
+  - nekoc src/benchs/fib.neko && neko src/benchs/fib
+  - nekoc src/benchs/fp.neko && neko src/benchs/fp
+  - nekoc src/benchs/module.neko && neko src/benchs/module
+  - nekoc src/benchs/nbodies.neko && neko src/benchs/nbodies
+  - nekoc src/benchs/nsieve.neko && neko src/benchs/nsieve
+  - nekoc src/benchs/recursive.neko && neko src/benchs/recursive
+  - nekoc src/benchs/startup.neko && neko src/benchs/startup
+  - nekoc src/benchs/test_ops.neko && neko src/benchs/test_ops
+

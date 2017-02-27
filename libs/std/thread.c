@@ -265,6 +265,22 @@ static value thread_create( value f, value param ) {
 }
 
 /**
+	thread_join: 'thread -> void
+	<doc>Wait for a thread to complete</doc>
+**/
+static value thread_join( value vt ) {
+	vthread *t;
+	val_check_kind(vt,k_thread);
+	t = val_thread(vt);
+#	ifdef NEKO_WINDOWS
+	WaitForSingleObject(t->tid, INFINITE);
+#	else
+	pthread_join(t->phandle, NULL);
+#	endif
+	return val_null;
+}
+
+/**
 	thread_current : void -> 'thread
 	<doc>Returns the current thread</doc>
 **/
@@ -629,6 +645,7 @@ static value deque_pop( value v, value block ) {
 }
 
 DEFINE_PRIM(thread_create,2);
+DEFINE_PRIM(thread_join,1);
 DEFINE_PRIM(thread_current,0);
 DEFINE_PRIM(thread_send,2);
 DEFINE_PRIM(thread_read_message,1);

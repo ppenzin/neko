@@ -3,7 +3,6 @@
 # mod_neko2.ndll
 
 add_library(mod_neko2.ndll MODULE
-	../../vm/stats.c # FIXME
 	mod_neko.c
 	cgi.c
 )
@@ -13,7 +12,7 @@ target_include_directories(mod_neko2.ndll
 	${APACHE_INCLUDE_DIRS}
 )
 
-target_link_libraries(mod_neko2.ndll libneko ${APACHE_LIBRARIES})
+target_link_libraries(mod_neko2.ndll libneko nekostats ${APACHE_LIBRARIES})
 
 # In static Apache case build dependencies first
 if (STATIC_APACHE)

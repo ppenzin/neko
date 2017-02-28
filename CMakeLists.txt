@@ -77,10 +77,6 @@ set(WITH_MYSQL ON CACHE BOOL "Build MySQL support.")
 set(WITH_SQLITE ON CACHE BOOL "Build Sqlite support.")
 set(WITH_APACHE ON CACHE BOOL "Build Apach modules.")
 
-# Process common headers in libraries
-# TODO libraries should not be built from this file, but rather by traversing the tree using add_subdirectory
-#add_subdirectory(libs)
-
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     if (${CMAKE_OSX_ARCHITECTURES} STREQUAL "i386")
         set(arch_64 "")
@@ -266,249 +262,39 @@ list(APPEND libneko_public_headers
 	${CMAKE_BINARY_DIR}/neko.h
 )
 
-add_library(libneko SHARED
-	vm/alloc.c
-	vm/builtins.c
-	vm/callback.c
-	vm/elf.c
-	vm/interp.c
-	vm/load.c
-	vm/objtable.c
-	vm/others.c
-	vm/hash.c
-	vm/module.c
-	vm/jit_x86.c
-	vm/threads.c
-)
+# A script to create a flat installation for archive package
+set (NEKO_FLATTEN_SCRIPT ${CMAKE_BINARY_DIR}/cmake/flatten.cmake)
+configure_file(
+	"${CMAKE_SOURCE_DIR}/cmake/flatten.cmake.in"
+	${NEKO_FLATTEN_SCRIPT}
+	IMMEDIATE @ONLY)
 
-add_executable(nekovm
-	vm/stats.c
-	vm/main.c
-)
+# Decide where to install everything
 
-if (STATIC_BOEHMGC)
-	if (WIN32)
-		ExternalProject_Add(BoehmGC
-			${EP_CONFIGS}
-			URL http://www.hboehm.info/gc/gc_source/gc-7.1.tar.gz
-			URL_MD5 2ff9924c7249ef7f736ecfe6f08f3f9b
-			CMAKE_ARGS
-				-Wno-dev
-				-Denable_threads=ON
-				-DCMAKE_USE_WIN32_THREADS_INIT=ON
-			PATCH_COMMAND
-				${CMAKE_COMMAND} -E copy
-					${CMAKE_SOURCE_DIR}/libs/gc/CMakeLists.txt
-					${CMAKE_BINARY_DIR}/libs/src/BoehmGC/CMakeLists.txt
-				&& cd ${CMAKE_BINARY_DIR}/libs/src/BoehmGC &&
-				${GIT_EXECUTABLE} apply --ignore-space-change --ignore-whitespace --whitespace=nowarn --unsafe-paths ${CMAKE_SOURCE_DIR}/libs/gc/av_safety.patch
-			INSTALL_COMMAND
-				${CMAKE_COMMAND} -E copy_directory
-					${CMAKE_BINARY_DIR}/libs/src/BoehmGC/include
-					${CMAKE_BINARY_DIR}/libs/src/BoehmGC-build/include/gc
-		)
-		set(GC_INCLUDE_DIR ${CMAKE_BINARY_DIR}/libs/src/BoehmGC-build/include)
-		set(GC_LIBRARIES
-			${CMAKE_BINARY_DIR}/libs/src/BoehmGC-build/${CMAKE_CFG_INTDIR}/gcmt-dll.lib
-		)
-		add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/gcmt-dll.dll
-			DEPENDS BoehmGC
-			COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/libs/src/BoehmGC-build/${CMAKE_CFG_INTDIR}/gcmt-dll.dll ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
-		)
-		add_custom_target(gcmt-dll.dll ALL
-			DEPENDS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/gcmt-dll.dll
-		)
-		add_dependencies(nekovm gcmt-dll.dll)
-	else()
-		ExternalProject_Add(libatomic_ops
-			${EP_CONFIGS}
-			URL http://www.ivmaisoft.com/_bin/atomic_ops/libatomic_ops-7.4.2.tar.gz
-			URL_MD5 1d6538604b314d2fccdf86915e5c0857
-			CONFIGURE_COMMAND echo skip config
-			BUILD_COMMAND echo skip build
-			INSTALL_COMMAND echo skip install
-		)
+if (WIN32)
+	set(DEST_BIN .)
+	set(DEST_LIB .)
+	set(DEST_NDLL .)
+	set(DEST_INCLUDE "include")
 
-		ExternalProject_Add(BoehmGC
-			${EP_CONFIGS}
-			DEPENDS libatomic_ops
-			URL http://hboehm.info/gc/gc_source/gc-7.4.2.tar.gz
-			URL_MD5 12c05fd2811d989341d8c6d81f66af87
-			PATCH_COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_BINARY_DIR}/libs/src/libatomic_ops ${CMAKE_BINARY_DIR}/libs/src/BoehmGC/libatomic_ops
-			CONFIGURE_COMMAND cd ${CMAKE_BINARY_DIR}/libs/src/BoehmGC &&
-				./configure
-					--prefix=${CMAKE_BINARY_DIR}/libs/src/BoehmGC-build
-					--enable-threads=posix
-					--with-pic
-					--enable-shared=no
-					--enable-static=yes
-					--enable-silent-rules
-					--silent
-			BUILD_COMMAND cd ${CMAKE_BINARY_DIR}/libs/src/BoehmGC &&
-				make CFLAGS=-w
-			INSTALL_COMMAND cd ${CMAKE_BINARY_DIR}/libs/src/BoehmGC &&
-				make install
-		)
-
-		# don't want to add libatomic_ops to external_deps,
-		# but want download_static_deps depends on it
-		add_dependencies(BoehmGC-download libatomic_ops-download)
-
-		set(GC_INCLUDE_DIR ${CMAKE_BINARY_DIR}/libs/src/BoehmGC-build/include)
-		set(GC_LIBRARIES
-			${CMAKE_BINARY_DIR}/libs/src/BoehmGC-build/lib/libgc.a
-		)
-	endif()
-	set_target_properties(BoehmGC PROPERTIES ${EP_PROPS})
-	add_dependencies(libneko BoehmGC)
+	set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION .)
+	include(InstallRequiredSystemLibraries)
+	install (
+		FILES
+			${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/gcmt-dll.dll
+		DESTINATION .
+	)
 else()
-	find_package(BoehmGC REQUIRED)
+	set(DEST_BIN ${CMAKE_INSTALL_BINDIR})
+	set(DEST_LIB ${CMAKE_INSTALL_LIBDIR})
+	set(DEST_NDLL ${CMAKE_INSTALL_LIBDIR}/neko) # should match NEKO_MODULE_PATH
+	set(DEST_INCLUDE ${CMAKE_INSTALL_INCLUDEDIR}/${CMAKE_LIBRARY_ARCHITECTURE})
 endif()
 
-target_include_directories(libneko PRIVATE ${GC_INCLUDE_DIR})
+set(BOOT_SRC ${CMAKE_CURRENT_SOURCE_DIR}/boot)
 
-target_link_libraries(libneko ${GC_LIBRARIES})
-target_link_libraries(nekovm libneko)
-
-if(UNIX)
-        if (NOT ${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD")
-		set(DL_LIB "dl")
-	endif()
-	find_package(Threads)
-	target_link_libraries(libneko ${DL_LIB} m ${CMAKE_THREAD_LIBS_INIT})
-endif()
-
-set_target_properties(nekovm libneko
-	PROPERTIES
-	OUTPUT_NAME neko
-)
-
-set_target_properties(libneko
-	PROPERTIES
-	VERSION ${NEKO_VERSION}
-	SOVERSION ${NEKO_VERSION_MAJOR}
-	COMPILE_DEFINITIONS "_USRDLL;NEKOVM_DLL_EXPORTS;NEKO_SOURCES"
-	PUBLIC_HEADER "${libneko_public_headers}"
-)
-
-#######################
-
-# compilers
-# nekoc, nekoml, nekotools, and test.n
-
-if (CMAKE_HOST_WIN32)
-	set(set_neko_env set NEKOPATH=${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-	set(neko_exec $<TARGET_FILE:nekovm>)
-elseif(CMAKE_HOST_APPLE)
-	set(set_neko_env "")
-	set(neko_exec DYLD_FALLBACK_LIBRARY_PATH=${CMAKE_RUNTIME_OUTPUT_DIRECTORY} NEKOPATH=${CMAKE_RUNTIME_OUTPUT_DIRECTORY} $<TARGET_FILE:nekovm>)
-else()
-	set(set_neko_env "")
-	set(neko_exec LD_LIBRARY_PATH=${CMAKE_RUNTIME_OUTPUT_DIRECTORY} NEKOPATH=${CMAKE_RUNTIME_OUTPUT_DIRECTORY} $<TARGET_FILE:nekovm>)
-endif()
-
-file(GLOB compilers_src
-	src/neko/*.nml
-	src/nekoml/*.nml
-	boot/*.n
-)
-
-add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoc.n ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoml.n
-	COMMAND ${set_neko_env}
-
-	COMMAND ${neko_exec} ../boot/nekoml.n -nostd neko/Main.nml nekoml/Main.nml
-	COMMAND ${neko_exec} ../boot/nekoc.n -link ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoc.n neko/Main
-	COMMAND ${neko_exec} ../boot/nekoc.n -link ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoml.n nekoml/Main
-
-	VERBATIM
-	DEPENDS nekovm std.ndll ${compilers_src}
-	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/src
-)
-
-add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test.n
-	COMMAND ${set_neko_env}
-	COMMAND ${neko_exec} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoc.n tools/test.neko
-	COMMAND ${CMAKE_COMMAND} -E copy tools/test.n ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
-	COMMAND ${CMAKE_COMMAND} -E remove tools/test.n
-	VERBATIM
-	DEPENDS nekovm std.ndll ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoc.n ${CMAKE_SOURCE_DIR}/src/tools/test.neko
-	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/src
-)
-add_custom_target(test.n ALL DEPENDS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test.n)
-
-add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoboot.n
-	COMMAND ${set_neko_env}
-	COMMAND ${neko_exec} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoc.n tools/nekoboot.neko
-	COMMAND ${CMAKE_COMMAND} -E copy tools/nekoboot.n ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
-	# COMMAND ${CMAKE_COMMAND} -E remove tools/nekoboot.n
-	VERBATIM
-	DEPENDS nekovm std.ndll ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoc.n ${CMAKE_SOURCE_DIR}/src/tools/nekoboot.neko
-	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/src
-)
-
-file(GLOB nekotools_src
-	src/tools/*.nml
-)
-
-add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekotools.n
-	COMMAND ${set_neko_env}
-	COMMAND ${neko_exec} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoml.n -nostd -p tools Tools.nml
-	COMMAND ${neko_exec} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoc.n -link ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekotools.n Tools
-	VERBATIM
-	DEPENDS nekovm std.ndll
-		${nekotools_src}
-		${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoc.n
-		${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoml.n
-		${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoboot.n
-	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/src
-)
-
-add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/nekoc.c
-	COMMAND ${set_neko_env}
-	COMMAND ${neko_exec} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoboot -c ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoc.n
-	COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoc.c ${CMAKE_BINARY_DIR}
-	COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoc.c
-	VERBATIM
-	DEPENDS nekovm std.ndll ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoboot.n ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoc.n
-	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-)
-add_executable(nekoc ${CMAKE_BINARY_DIR}/nekoc.c)
-target_link_libraries(nekoc libneko)
-
-add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/nekoml.c
-	COMMAND ${set_neko_env}
-	COMMAND ${neko_exec} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoboot -c ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoml.n
-	COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoml.c ${CMAKE_BINARY_DIR}
-	COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoml.c
-	VERBATIM
-	DEPENDS nekovm std.ndll ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoboot.n ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoml.n
-	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-)
-add_executable(nekoml ${CMAKE_BINARY_DIR}/nekoml.c)
-target_link_libraries(nekoml libneko)
-
-add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/nekotools.c
-	COMMAND ${set_neko_env}
-	COMMAND ${neko_exec} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoboot -c ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekotools.n
-	COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekotools.c ${CMAKE_BINARY_DIR}
-	COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekotools.c
-	VERBATIM
-	DEPENDS nekovm std.ndll ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoboot.n ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekotools.n
-	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-)
-add_executable(nekotools ${CMAKE_BINARY_DIR}/nekotools.c)
-target_link_libraries(nekotools libneko)
-
-file(GLOB CORE_NMLS RELATIVE ${CMAKE_SOURCE_DIR}/src src/core/*.nml)
-set(nekoml_std ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoml.std)
-add_custom_command(OUTPUT ${nekoml_std}
-	COMMAND ${set_neko_env}
-	COMMAND ${neko_exec} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoml.n -nostd neko/Main.nml nekoml/Main.nml ${CORE_NMLS} -pack ${nekoml_std}
-	VERBATIM
-	DEPENDS zlib.ndll ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoml.n
-	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/src
-)
-add_custom_target(nekoml.std ALL DEPENDS ${nekoml_std})
+add_subdirectory(vm)
+add_subdirectory(src)
 
 #######################
 
@@ -570,43 +356,6 @@ add_custom_target(source_archive_fat
 #######################
 
 # install target
-
-if (WIN32)
-	set(DEST_BIN .)
-	set(DEST_LIB .)
-	set(DEST_NDLL .)
-	set(DEST_INCLUDE "include")
-
-	set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION .)
-	include(InstallRequiredSystemLibraries)
-	install (
-		FILES
-			${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/gcmt-dll.dll
-		DESTINATION .
-	)
-else()
-	set(DEST_BIN ${CMAKE_INSTALL_BINDIR})
-	set(DEST_LIB ${CMAKE_INSTALL_LIBDIR})
-	set(DEST_NDLL ${CMAKE_INSTALL_LIBDIR}/neko) # should match NEKO_MODULE_PATH
-	set(DEST_INCLUDE ${CMAKE_INSTALL_INCLUDEDIR}/${CMAKE_LIBRARY_ARCHITECTURE})
-endif()
-
-install (
-	TARGETS
-		nekovm
-		nekoc
-		nekoml
-		nekotools
-		libneko
-	EXPORT NekoTargets
-	RUNTIME DESTINATION ${DEST_BIN}
-	LIBRARY DESTINATION ${DEST_LIB}
-	PUBLIC_HEADER DESTINATION ${DEST_INCLUDE}
-)
-install (
-	FILES ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/nekoml.std
-	DESTINATION ${DEST_NDLL}
-)
 
 if (NOT ${CMAKE_VERSION} VERSION_LESS 2.8.8)
 	include(CMakePackageConfigHelpers)
@@ -678,13 +427,6 @@ endif()
 if (RUN_LDCONFIG)
 	install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/ldconfig.cmake")
 endif()
-
-# A script to create a flat installation for archive package
-set (NEKO_FLATTEN_SCRIPT ${CMAKE_BINARY_DIR}/cmake/flatten.cmake)
-configure_file(
-	"${CMAKE_SOURCE_DIR}/cmake/flatten.cmake.in"
-	${NEKO_FLATTEN_SCRIPT}
-	IMMEDIATE @ONLY)
 
 install(SCRIPT ${NEKO_FLATTEN_SCRIPT})
 
